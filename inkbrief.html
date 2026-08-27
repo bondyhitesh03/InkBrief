@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InkBrief — turn scrawl into study notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --paper: #ECE6D6;
+    --paper-dark: #E2DAC4;
+    --ink: #232323;
+    --ink-soft: #4A4A46;
+    --pen-blue: #2E4374;
+    --pen-blue-soft: #5A6FA0;
+    --red: #A8402F;
+    --red-soft: #C46A57;
+    --highlight: #E7C948;
+    --rule-line: #C9BFA0;
+    --card: #F5F1E4;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--paper);
+    background-image:
+      linear-gradient(var(--rule-line) 1px, transparent 1px);
+    background-size: 100% 34px;
+    background-position: 0 148px;
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    position: relative;
+  }
+  body::before{
+    content:"";
+    position: fixed;
+    top:0; left: 56px; bottom:0;
+    width: 2px;
+    background: var(--red-soft);
+    opacity:.55;
+    z-index:0;
+  }
+  .wrap{
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 32px 120px 88px;
+    position: relative;
+    z-index: 1;
+  }
+  header.hero{ margin-bottom: 40px; }
+  .hero-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .history-btn{
+    font-family:'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 14px;
+    background: var(--card);
+    color: var(--pen-blue);
+    border: 1px solid var(--rule-line);
+    border-radius: var(--radius);
+    cursor: pointer;
+    white-space: nowrap;
+    margin-top: 4px;
+  }
+  .history-btn:hover{ background: #fff; }
+  .eyebrow{
+    font-family:'Caveat', cursive;
+    font-size: 22px;
+    color: var(--red);
+    transform: rotate(-2deg);
+    display:inline-block;
+    margin-bottom: 4px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight: 700;
+    font-size: 52px;
+    line-height: 1.02;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.01em;
+  }
+  .sub{
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+    line-height: 1.5;
+  }
+
+  .settings{
+    margin: 32px 0;
+    padding: 16px 18px;
+    background: var(--card);
+    border: 1px solid var(--rule-line);
+    border-radius: var(--radius);
+  }
+  .settings summary{
+    cursor:pointer;
+    font-weight:600;
+    font-size: 14px;
+    color: var(--pen-blue);
+    list-style: none;
+    display:flex; align-items:center; gap:8px;
+  }
+  .settings summary::-webkit-details-marker{ display:none; }
+  .settings summary::before{ content:"⚙"; }
+  .settings[open] summary{ margin-bottom: 12px; }
+  .settings input[type=password], .settings input[type=text]{
+    width: 100%;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    border: 1px solid var(--rule-line);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--ink);
+  }
+  .settings .hint{
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .settings .hint a{ color: var(--pen-blue); }
+  .save-msg{ font-size: 12px; color: var(--red); margin-top: 6px; display:none; }
+
+  .dropzone{
+    border: 2px dashed var(--pen-blue-soft);
+    border-radius: var(--radius);
+    padding: 44px 24px;
+    text-align: center;
+    background: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+    position: relative;
+  }
+  .dropzone.drag{
+    border-color: var(--red);
+    background: rgba(255,255,255,0.6);
+  }
+  .dropzone svg{ width:34px; height:34px; margin-bottom: 10px; opacity:.7; }
+  .dropzone p{ margin: 0; font-size: 15px; color: var(--ink-soft); }
+  .dropzone .cta{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 19px;
+    color: var(--ink);
+    display:block;
+    margin-bottom: 6px;
+  }
+  .dropzone input{ display:none; }
+  .filename{
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--pen-blue);
+    font-weight: 600;
+  }
+
+  button.primary{
+    margin-top: 18px;
+    font-family:'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 12px 22px;
+    background: var(--pen-blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background .15s ease, transform .1s ease;
+  }
+  button.primary:hover{ background: #24345c; }
+  button.primary:disabled{ background:#9aa3ba; cursor:not-allowed; }
+  button.primary:active:not(:disabled){ transform: translateY(1px); }
+
+  .status{
+    margin-top: 22px;
+    font-family:'Caveat', cursive;
+    font-size: 22px;
+    color: var(--red);
+    display:none;
+    align-items: center;
+    gap: 10px;
+  }
+  .status.show{ display:flex; }
+  .spinner{
+    width: 16px; height:16px;
+    border: 2px solid var(--red-soft);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .error{
+    margin-top: 18px;
+    padding: 12px 14px;
+    background: #F6E3DE;
+    border-left: 3px solid var(--red);
+    color: #6B2418;
+    font-size: 14px;
+    border-radius: var(--radius);
+    display:none;
+    line-height:1.5;
+  }
+  .error.show{ display:block; }
+
+  .results{ margin-top: 52px; display:none; }
+  .results.show{ display:block; }
+
+  .topic-tag{
+    font-family:'Caveat', cursive;
+    font-size: 24px;
+    color: var(--pen-blue);
+    transform: rotate(-1.5deg);
+    display:inline-block;
+    margin-bottom: 18px;
+    border-bottom: 2px solid var(--highlight);
+  }
+
+  section.block{ margin-bottom: 40px; }
+  section.block h2{
+    font-family:'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    display:flex;
+    align-items:baseline;
+    gap: 10px;
+  }
+  section.block h2 .n{
+    font-family:'Caveat', cursive;
+    color: var(--red);
+    font-size: 20px;
+  }
+  .prose{ font-size: 16px; line-height: 1.75; color: var(--ink); }
+  .prose p{ margin: 0 0 14px 0; }
+
+  .example-card{
+    background: var(--card);
+    border-left: 3px solid var(--highlight);
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    font-size: 15.5px;
+    line-height: 1.7;
+  }
+  .example-card .label{
+    font-family:'Caveat', cursive;
+    font-size: 19px;
+    color: var(--ink-soft);
+    display:block;
+    margin-bottom: 4px;
+  }
+
+  ol.questions{
+    list-style: none;
+    counter-reset: q;
+    padding: 0;
+    margin: 0;
+  }
+  ol.questions li{
+    counter-increment: q;
+    position: relative;
+    padding: 14px 0 14px 40px;
+    border-bottom: 1px dashed var(--rule-line);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+  ol.questions li:last-child{ border-bottom: none; }
+  ol.questions li::before{
+    content: counter(q);
+    position:absolute;
+    left: 0; top: 13px;
+    width: 24px; height: 24px;
+    border: 2px solid var(--red);
+    color: var(--red);
+    border-radius: 50%;
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size: 15px;
+    display:flex; align-items:center; justify-content:center;
+    transform: rotate(-4deg);
+  }
+
+  .tldr{
+    background: var(--ink);
+    color: var(--paper);
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    font-size: 16px;
+    line-height: 1.5;
+    margin-bottom: 34px;
+    position: relative;
+  }
+  .tldr .label{
+    font-family:'Caveat', cursive;
+    font-size: 18px;
+    color: var(--highlight);
+    display:block;
+    margin-bottom: 2px;
+  }
+  .tldr strong{ color: var(--highlight); }
+
+  ul.keypoints{
+    list-style:none;
+    padding:0;
+    margin:0;
+  }
+  ul.keypoints li{
+    position: relative;
+    padding: 0 0 14px 26px;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  ul.keypoints li::before{
+    content: "";
+    position: absolute;
+    left: 2px; top: 8px;
+    width: 8px; height: 8px;
+    background: var(--red);
+    border-radius: 1px;
+    transform: rotate(45deg);
+  }
+  ul.keypoints strong{
+    background: linear-gradient(transparent 60%, var(--highlight) 60%);
+    font-weight: 600;
+    padding: 0 1px;
+  }
+
+  .codes-section{ display:none; }
+  .codes-section.show{ display:block; }
+  .code-block{
+    background: #23262B;
+    color: #E9E5D6;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .code-block .caption{
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: var(--highlight);
+    margin-bottom: 8px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+  }
+  .code-block pre{
+    margin:0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .q-subhead{
+    font-family:'Caveat', cursive;
+    font-size: 19px;
+    color: var(--pen-blue);
+    margin: 22px 0 4px 0;
+  }
+  .q-subhead:first-child{ margin-top: 0; }
+
+  .actions-row{
+    display:flex;
+    gap: 14px;
+    align-items:center;
+    flex-wrap: wrap;
+    margin-top: 30px;
+  }
+  button.secondary{
+    font-family:'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 18px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  button.secondary:hover{ background: #8A3325; }
+  .reset{
+    background:none; border:none;
+    font-family:'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-decoration: underline;
+    cursor:pointer;
+    padding:0;
+  }
+
+  /* Themed print sheet, rendered off-screen and captured for the PDF export */
+  #printSheet{
+    position: absolute;
+    left: -10000px;
+    top: 0;
+    width: 760px;
+    background: var(--paper);
+    background-image: linear-gradient(var(--rule-line) 1px, transparent 1px);
+    background-size: 100% 34px;
+    background-position: 0 156px;
+    padding: 54px 44px 60px 84px;
+    color: var(--ink);
+  }
+  #printSheet .margin-line{
+    position: absolute;
+    top: 0; left: 44px; bottom: 0;
+    width: 2px;
+    background: var(--red-soft);
+    opacity: .55;
+  }
+  #printSheet .ps-eyebrow{
+    font-family:'Caveat', cursive;
+    font-size: 20px;
+    color: var(--red);
+    transform: rotate(-2deg);
+    display:inline-block;
+    margin-bottom: 2px;
+  }
+  #printSheet h1{
+    font-family:'Fraunces', serif;
+    font-weight: 700;
+    font-size: 40px;
+    margin: 0 0 24px 0;
+    letter-spacing: -0.01em;
+  }
+  #printSheet .topic-tag{ margin-bottom: 22px; }
+  #printSheet section.block{ margin-bottom: 32px; }
+  #printSheet ol.questions li{ padding-left: 40px; }
+
+  /* Question controls: checkbox + reveal-answer */
+  ol.questions li{ padding-left: 46px; }
+  ol.questions li.done .q-text{
+    text-decoration: line-through;
+    color: var(--ink-soft);
+    opacity: .65;
+  }
+  .q-controls{
+    display:flex;
+    align-items:flex-start;
+    gap: 10px;
+  }
+  .q-check{
+    width: 17px; height: 17px;
+    accent-color: var(--red);
+    margin-top: 3px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .q-body{ flex: 1; }
+  .reveal-btn{
+    margin-top: 8px;
+    background: none;
+    border: 1px dashed var(--pen-blue-soft);
+    color: var(--pen-blue);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .reveal-btn:hover{ background: rgba(46,67,116,0.06); }
+  .q-answer{
+    display:none;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--card);
+    border-left: 3px solid var(--pen-blue-soft);
+    border-radius: var(--radius);
+    font-size: 14.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .q-answer.show{ display:block; }
+  .q-answer .tag{
+    font-family:'Caveat', cursive;
+    color: var(--pen-blue);
+    font-size: 16px;
+    display:block;
+    margin-bottom: 3px;
+  }
+
+  /* Modal (shared by flashcards + history) */
+  .modal-overlay{
+    display:none;
+    position: fixed;
+    inset: 0;
+    background: rgba(35,38,43,0.55);
+    z-index: 50;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-box{
+    background: var(--paper);
+    border-radius: 6px;
+    max-width: 520px;
+    width: 100%;
+    max-height: 84vh;
+    overflow-y: auto;
+    padding: 26px 26px 22px 26px;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  }
+  .modal-close{
+    position: absolute;
+    top: 14px; right: 16px;
+    background:none; border:none;
+    font-size: 20px;
+    color: var(--ink-soft);
+    cursor:pointer;
+    line-height:1;
+  }
+  .modal-title{
+    font-family:'Fraunces', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 18px 0;
+  }
+
+  /* Flashcards */
+  .fc-progress{
+    font-family:'Caveat', cursive;
+    font-size: 17px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  .fc-card{
+    background: var(--card);
+    border: 1px solid var(--rule-line);
+    border-radius: 8px;
+    min-height: 180px;
+    padding: 26px 22px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1.5;
+    position: relative;
+  }
+  .fc-card .fc-hint{
+    position:absolute;
+    bottom: 10px; left: 0; right: 0;
+    font-family:'Caveat', cursive;
+    font-size: 14px;
+    color: var(--ink-soft);
+    opacity: .7;
+  }
+  .fc-card.flipped{ background: #fff; }
+  .fc-card strong{ color: var(--red); }
+  .fc-nav{
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+    margin-top: 16px;
+  }
+  .fc-nav button{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size: 13px;
+    padding: 8px 14px;
+    background: var(--pen-blue);
+    color:#fff;
+    border:none;
+    border-radius: var(--radius);
+    cursor:pointer;
+  }
+  .fc-nav button:disabled{ background:#aab0c2; cursor:not-allowed; }
+
+  /* History list */
+  .history-empty{
+    font-size: 14px;
+    color: var(--ink-soft);
+    padding: 20px 0;
+    text-align:center;
+  }
+  .history-item{
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--rule-line);
+  }
+  .history-item:last-child{ border-bottom:none; }
+  .history-item-main{ cursor:pointer; flex:1; }
+  .history-item-topic{
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--ink);
+  }
+  .history-item-date{
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .history-delete{
+    background:none; border:none;
+    color: var(--red-soft);
+    font-size: 12px;
+    cursor:pointer;
+    text-decoration: underline;
+  }
+
+  footer{
+    margin-top: 60px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    opacity: .7;
+  }
+
+  @media (max-width: 600px){
+    .wrap{ padding: 40px 20px 100px 48px; }
+    body::before{ left: 26px; }
+    h1{ font-size: 38px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="hero-top">
+      <div>
+        <span class="eyebrow">~Created by Hitesh</span>
+        <h1>InkBrief</h1>
+      </div>
+      <button class="history-btn" id="historyBtn" type="button">📖 History</button>
+    </div>
+    <p class="sub">Upload a photo or scan of your handwritten notes. Get them explained simply, with an example — and ten questions pitched at exactly the right level to test yourself with.</p>
+  </header>
+
+  <details class="settings" id="settingsBox">
+    <summary>Gemini API key</summary>
+    <input type="password" id="apiKey" placeholder="Paste your Gemini API key here" autocomplete="off" />
+    <div class="hint">
+      Free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — sign in, click "Create API key," paste it here.
+      It's saved only in this browser (never sent anywhere but Google's API) so you only need to do this once.
+    </div>
+    <div class="save-msg" id="saveMsg">Saved ✓</div>
+  </details>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="application/pdf" />
+    <span class="cta">Drop your notes PDF here</span>
+    <p>or click to choose a file</p>
+    <div class="filename" id="filename"></div>
+  </div>
+
+  <button class="primary" id="goBtn" disabled>Summarize my notes</button>
+
+  <div class="status" id="status"><span class="spinner"></span><span id="statusText">Reading your handwriting…</span></div>
+  <div class="error" id="error"></div>
+
+  <div class="results" id="results">
+    <span class="topic-tag" id="topicTag"></span>
+
+    <div class="tldr">
+      <span class="label">TL;DR —</span>
+      <span id="tldrOut"></span>
+    </div>
+
+    <section class="block">
+      <h2><span class="n">1.</span> The short version</h2>
+      <ul class="keypoints" id="keypointsOut"></ul>
+    </section>
+
+    <section class="block">
+      <h2><span class="n">2.</span> An example</h2>
+      <div class="example-card">
+        <span class="label">Picture this —</span>
+        <div id="exampleOut"></div>
+      </div>
+    </section>
+
+    <section class="block codes-section" id="codesSection">
+      <h2><span class="n">3.</span> Codes in the summary</h2>
+      <div id="codesOut"></div>
+    </section>
+
+    <section class="block">
+      <h2><span class="n" id="qSectionNum">4.</span> Test yourself — 10 questions</h2>
+      <div class="q-subhead" id="practicalHead">Practical / DSA-style</div>
+      <ol class="questions" id="questionsPractical"></ol>
+      <div class="q-subhead" id="theoryHead">Theory</div>
+      <ol class="questions" id="questionsTheory"></ol>
+    </section>
+
+    <div class="actions-row">
+      <button class="secondary" id="downloadBtn">Download as PDF</button>
+      <button class="history-btn" id="flashcardBtn" type="button">🗂 Flashcards</button>
+      <button class="reset" id="resetBtn">Summarize another PDF ↺</button>
+    </div>
+  </div>
+
+  <!-- Flashcards modal -->
+  <div class="modal-overlay" id="fcOverlay">
+    <div class="modal-box">
+      <button class="modal-close" id="fcClose">✕</button>
+      <h3 class="modal-title">Flashcards</h3>
+      <div class="fc-progress" id="fcProgress"></div>
+      <div class="fc-card" id="fcCard">
+        <div id="fcCardText"></div>
+        <span class="fc-hint">tap to flip</span>
+      </div>
+      <div class="fc-nav">
+        <button id="fcPrev">← Prev</button>
+        <button id="fcNext">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History modal -->
+  <div class="modal-overlay" id="historyOverlay">
+    <div class="modal-box">
+      <button class="modal-close" id="historyClose">✕</button>
+      <h3 class="modal-title">Saved summaries</h3>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <footer>Runs entirely in your browser. Your notes and API key never touch any server but Google's.</footer>
+</div>
+
+<div id="printSheet"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const MODEL = 'gemini-3.6-flash';
+
+const $ = (id) => document.getElementById(id);
+const apiKeyInput = $('apiKey');
+const settingsBox = $('settingsBox');
+const dropzone = $('dropzone');
+const fileInput = $('fileInput');
+const filenameEl = $('filename');
+const goBtn = $('goBtn');
+const statusEl = $('status');
+const statusText = $('statusText');
+const errorEl = $('error');
+const resultsEl = $('results');
+
+let selectedFile = null;
+
+// --- API key persistence (local to this browser only) ---
+const savedKey = localStorage.getItem('marginalia_api_key');
+if (savedKey) {
+  apiKeyInput.value = savedKey;
+} else {
+  settingsBox.open = true;
+}
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('marginalia_api_key', apiKeyInput.value.trim());
+  const msg = $('saveMsg');
+  msg.style.display = 'block';
+  setTimeout(() => msg.style.display = 'none', 1500);
+});
+
+// --- File selection ---
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (file.type !== 'application/pdf') {
+    showError('Please choose a PDF file.');
+    return;
+  }
+  selectedFile = file;
+  filenameEl.textContent = file.name;
+  goBtn.disabled = false;
+  hideError();
+}
+
+// --- PDF -> images ---
+async function pdfToImages(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const images = [];
+  const maxPages = Math.min(pdf.numPages, 12); // keep requests reasonable
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 2.8 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    images.push(dataUrl.split(',')[1]);
+  }
+  return images;
+}
+
+// --- Gemini call ---
+const PROMPT = `You are helping a college student (studying Computer Science / DSA-heavy coursework) revise from photos of their own handwritten class notes, right before an exam. They are short on time and find long paragraphs boring — they want it sharp, scannable, and correct.
+
+Before writing anything: look at EVERY page provided, slowly and carefully, left to right, top to bottom. Do not skim. Read every line of handwriting, every diagram label, every equation, every arrow, every margin note, and every line of code or pseudocode, even if cramped or crossed out. Some pages may continue a thought from the previous page — treat all pages as one continuous lecture. If something is illegible, make your best educated guess from context rather than skipping it. Do not invent content that is not actually in the notes — you are summarizing what is there, not writing a generic textbook chapter on the guessed topic.
+
+Now produce:
+
+1. "topic": a short, specific topic name (not just the subject — the actual concept, e.g. "Dijkstra's Shortest Path Algorithm", not just "Graphs").
+
+2. "tldr": ONE punchy sentence (max ~25 words) that captures the single most important idea in the notes, in the simplest possible everyday words — no jargon, no textbook phrasing. This is what the student reads if they only have 10 seconds.
+
+3. "key_points": 5 to 9 short bullet points (NOT paragraphs — each bullet is one line, max ~20 words). Each bullet should be one distinct, concrete fact, definition, or step from the notes — not vague restatements. Use VERY SIMPLE, everyday English — the kind you'd use talking to a friend, not a textbook. Avoid heavy academic words (don't say "utilize", say "use"; don't say "facilitates", say "helps"; don't say "constitutes", say "is"). If a technical term is unavoidable (e.g. "recursion", "pointer"), keep it but immediately explain it in plain words right there in the same bullet — never leave a term unexplained. Wrap the 1-3 most important words/terms in each bullet with **double asterisks** so they stand out (e.g. "**Recursion** just means a function calling itself, like a smaller copy of the same problem.").
+
+4. "example": ONE concrete, relatable real-world example or worked mini-example that makes the core idea click, written in simple everyday language a beginner would follow easily. 2-4 sentences max. If the notes contain a worked numeric/traced example already, you may use and clarify that instead of inventing a new one.
+
+5. "code_snippets": an array of every distinct piece of code or pseudocode that actually appears in the notes, transcribed as accurately as possible. Each item: {"language": "e.g. C++/Python/Java/pseudocode", "caption": "what this code does, max 8 words", "code": "the code, preserving line breaks as \\n, fixing only obvious handwriting-transcription errors (like a clearly miswritten bracket), not rewriting the logic"}. If there is NO code anywhere in the notes, return an empty array [].
+
+6. "is_coding_topic": true if this topic is fundamentally a DSA / programming / algorithmic topic (so problems can be posed as coding problems), false if it's a theory-only subject (e.g. a conceptual/definitional topic with no natural coding angle).
+
+7. Practice questions — EXACTLY 10 total, split into two arrays:
+   - "questions_practical": DSA/coding-style problems — each an object {"question": "...", "answer": "..."}. The question is phrased like a real coding-interview or lab problem the student would have to CODE a solution for (state the problem, mention input/output or constraints briefly where relevant). The answer is a concise model solution: for coding problems give working code (with a one-line approach explanation above it); for applied/practical questions give a clear worked answer. If is_coding_topic is true, most questions (aim for 6-7) should be here, at the SAME difficulty level as what's taught in these notes — not easier, not harder. If is_coding_topic is false, put fewer here (aim for 2-4) reframed as practical/applied problems (a scenario where they must apply the concept), not code.
+   - "questions_theoretical": conceptual/definitional/"explain why" questions — each an object {"question": "...", "answer": "..."}, where the answer is a concise (2-4 sentence) correct answer in simple language. Fill the remainder to reach 10 total combined.
+   Never leave either array empty if a total of 10 is required — every topic has at least a couple of questions of each kind.
+
+Respond ONLY with valid JSON, no markdown fences, no commentary, matching exactly this shape:
+{
+  "topic": "...",
+  "tldr": "...",
+  "key_points": ["...", "..."],
+  "example": "...",
+  "code_snippets": [{"language": "...", "caption": "...", "code": "..."}],
+  "is_coding_topic": true,
+  "questions_practical": [{"question": "...", "answer": "..."}],
+  "questions_theoretical": [{"question": "...", "answer": "..."}]
+}`;
+
+async function callGemini(apiKey, images) {
+  const parts = [{ text: PROMPT }];
+  for (const b64 of images) {
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: b64 } });
+  }
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 8192 }
+  };
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify(body)
+    }
+  );
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error(`Gemini API error (${resp.status}): ${errBody.slice(0, 300)}`);
+  }
+  const data = await resp.json();
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('Could not parse the model\'s response as JSON. Try again — it usually works on retry.');
+  }
+}
+
+// --- Rendering ---
+let lastData = null;
+let doneState = {};       // e.g. { p0: true, t2: true }
+let currentHistoryId = null; // set when viewing a saved item, so toggles update it
+
+function boldify(s) {
+  // Converts **term** -> <strong>term</strong>, escaping everything else first.
+  const escaped = escapeHtml(s || '');
+  return escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function normalizeQA(item) {
+  // Supports both {question, answer} objects and plain strings, just in case.
+  if (typeof item === 'string') return { question: item, answer: '' };
+  return { question: item.question || '', answer: item.answer || '' };
+}
+
+function buildQuestionLi(qa, key) {
+  const li = document.createElement('li');
+  li.dataset.key = key;
+  if (doneState[key]) li.classList.add('done');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'q-controls';
+
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.className = 'q-check';
+  check.checked = !!doneState[key];
+  check.addEventListener('change', () => {
+    doneState[key] = check.checked;
+    li.classList.toggle('done', check.checked);
+    persistDoneStateToHistory();
+  });
+
+  const body = document.createElement('div');
+  body.className = 'q-body';
+  const qText = document.createElement('div');
+  qText.className = 'q-text';
+  qText.textContent = qa.question;
+  body.appendChild(qText);
+
+  if (qa.answer) {
+    const revealBtn = document.createElement('button');
+    revealBtn.className = 'reveal-btn';
+    revealBtn.type = 'button';
+    revealBtn.textContent = 'Show answer';
+    const answerBox = document.createElement('div');
+    answerBox.className = 'q-answer';
+    answerBox.innerHTML = `<span class="tag">Answer —</span><span>${escapeHtml(qa.answer)}</span>`;
+    revealBtn.addEventListener('click', () => {
+      const showing = answerBox.classList.toggle('show');
+      revealBtn.textContent = showing ? 'Hide answer' : 'Show answer';
+    });
+    body.appendChild(revealBtn);
+    body.appendChild(answerBox);
+  }
+
+  wrap.appendChild(check);
+  wrap.appendChild(body);
+  li.appendChild(wrap);
+  return li;
+}
+
+function renderResults(data, opts = {}) {
+  lastData = data;
+  if (!opts.keepDoneState) doneState = {};
+  currentHistoryId = opts.historyId || null;
+
+  $('topicTag').textContent = data.topic || 'Your notes';
+  $('tldrOut').innerHTML = boldify(data.tldr || '');
+
+  const kp = $('keypointsOut');
+  kp.innerHTML = '';
+  (data.key_points || []).forEach(point => {
+    const li = document.createElement('li');
+    li.innerHTML = boldify(point);
+    kp.appendChild(li);
+  });
+
+  $('exampleOut').textContent = data.example || '';
+
+  // Code snippets
+  const codesSection = $('codesSection');
+  const codesOut = $('codesOut');
+  codesOut.innerHTML = '';
+  const snippets = data.code_snippets || [];
+  if (snippets.length) {
+    snippets.forEach(s => {
+      const block = document.createElement('div');
+      block.className = 'code-block';
+      const cap = document.createElement('div');
+      cap.className = 'caption';
+      cap.textContent = `${s.language || 'code'} — ${s.caption || ''}`;
+      const pre = document.createElement('pre');
+      pre.textContent = s.code || '';
+      block.appendChild(cap);
+      block.appendChild(pre);
+      codesOut.appendChild(block);
+    });
+    codesSection.classList.add('show');
+    $('qSectionNum').textContent = '4.';
+  } else {
+    codesSection.classList.remove('show');
+    $('qSectionNum').textContent = '3.';
+  }
+
+  // Questions, split, with checkboxes + answer reveal
+  const practical = (data.questions_practical || []).map(normalizeQA);
+  const theoretical = (data.questions_theoretical || []).map(normalizeQA);
+  const practicalList = $('questionsPractical');
+  const theoryList = $('questionsTheory');
+  practicalList.innerHTML = '';
+  theoryList.innerHTML = '';
+  practical.forEach((qa, i) => practicalList.appendChild(buildQuestionLi(qa, `p${i}`)));
+  theoretical.forEach((qa, i) => theoryList.appendChild(buildQuestionLi(qa, `t${i}`)));
+  $('practicalHead').style.display = practical.length ? 'block' : 'none';
+  $('theoryHead').style.display = theoretical.length ? 'block' : 'none';
+  $('practicalHead').textContent = data.is_coding_topic ? 'Practical / DSA-style' : 'Practical / applied';
+
+  resultsEl.classList.add('show');
+  resultsEl.scrollIntoView({ behavior: 'smooth' });
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function stripBold(s) {
+  return (s || '').replace(/\*\*(.+?)\*\*/g, '$1');
+}
+
+// --- PDF export (themed, matches the on-page look) ---
+function buildPrintSheet(d) {
+  const sheet = $('printSheet');
+  const codeHtml = (d.code_snippets || []).length ? `
+    <section class="block">
+      <h2><span class="n">•</span> Codes in the summary</h2>
+      ${d.code_snippets.map(s => `
+        <div class="code-block">
+          <div class="caption">${escapeHtml(s.language || 'code')} — ${escapeHtml(s.caption || '')}</div>
+          <pre>${escapeHtml(s.code || '')}</pre>
+        </div>
+      `).join('')}
+    </section>` : '';
+
+  const renderQaLi = (qa) => {
+    const norm = normalizeQA(qa);
+    const answerHtml = norm.answer
+      ? `<div class="q-answer show" style="margin-top:8px;"><span class="tag">Answer —</span><span>${escapeHtml(norm.answer)}</span></div>`
+      : '';
+    return `<li><div class="q-text">${escapeHtml(norm.question)}</div>${answerHtml}</li>`;
+  };
+
+  const practicalHtml = (d.questions_practical || []).length ? `
+    <div class="q-subhead">${d.is_coding_topic ? 'Practical / DSA-style' : 'Practical / applied'}</div>
+    <ol class="questions">${d.questions_practical.map(renderQaLi).join('')}</ol>` : '';
+
+  const theoryHtml = (d.questions_theoretical || []).length ? `
+    <div class="q-subhead">Theory</div>
+    <ol class="questions">${d.questions_theoretical.map(renderQaLi).join('')}</ol>` : '';
+
+  sheet.innerHTML = `
+    <div class="margin-line"></div>
+    <span class="ps-eyebrow">~Created by Hitesh</span>
+    <h1>InkBrief</h1>
+    <span class="topic-tag">${escapeHtml(d.topic || 'Your notes')}</span>
+
+    <div class="tldr">
+      <span class="label">TL;DR —</span>
+      <span>${boldify(d.tldr || '')}</span>
+    </div>
+
+    <section class="block">
+      <h2><span class="n">1.</span> The short version</h2>
+      <ul class="keypoints">${(d.key_points || []).map(p => `<li>${boldify(p)}</li>`).join('')}</ul>
+    </section>
+
+    <section class="block">
+      <h2><span class="n">2.</span> An example</h2>
+      <div class="example-card">
+        <span class="label">Picture this —</span>
+        <div>${escapeHtml(d.example || '')}</div>
+      </div>
+    </section>
+
+    ${codeHtml}
+
+    <section class="block">
+      <h2><span class="n">•</span> Test yourself — 10 questions</h2>
+      ${practicalHtml}
+      ${theoryHtml}
+    </section>
+  `;
+}
+
+async function downloadPdf() {
+  if (!lastData) return;
+  const btn = $('downloadBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Preparing PDF…';
+  try {
+    buildPrintSheet(lastData);
+    const sheet = $('printSheet');
+    // Let the browser finish laying out fonts/content before we capture it.
+    await new Promise(r => setTimeout(r, 60));
+
+    const canvas = await html2canvas(sheet, {
+      scale: 2,
+      backgroundColor: '#ECE6D6',
+      useCORS: true
+    });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const pageWpt = doc.internal.pageSize.getWidth();
+    const pageHpt = doc.internal.pageSize.getHeight();
+
+    // Canvas pixels-per-pdf-point, based on scaling the full width to the page width.
+    const pxPerPt = canvas.width / pageWpt;
+    const pageHeightPx = pageHpt * pxPerPt;
+
+    let renderedPx = 0;
+    let first = true;
+    while (renderedPx < canvas.height) {
+      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx);
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeightPx;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.drawImage(
+        canvas,
+        0, renderedPx, canvas.width, sliceHeightPx,
+        0, 0, canvas.width, sliceHeightPx
+      );
+      const imgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+      if (!first) doc.addPage();
+      const sliceHeightPt = sliceHeightPx / pxPerPt;
+      doc.addImage(imgData, 'JPEG', 0, 0, pageWpt, sliceHeightPt);
+      renderedPx += sliceHeightPx;
+      first = false;
+    }
+
+    const safeTopic = (lastData.topic || 'inkbrief-notes').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+    doc.save(`${safeTopic || 'inkbrief-notes'}.pdf`);
+  } catch (e) {
+    console.error(e);
+    showError('Could not generate the PDF. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+function showError(msg) {
+  errorEl.textContent = msg;
+  errorEl.classList.add('show');
+}
+function hideError() {
+  errorEl.classList.remove('show');
+}
+function setStatus(msg) {
+  statusText.textContent = msg;
+  statusEl.classList.add('show');
+}
+function clearStatus() {
+  statusEl.classList.remove('show');
+}
+
+// --- Main action ---
+goBtn.addEventListener('click', async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    showError('Add your free Gemini API key above first (click "Gemini API key" to expand).');
+    settingsBox.open = true;
+    return;
+  }
+  if (!selectedFile) return;
+
+  hideError();
+  resultsEl.classList.remove('show');
+  goBtn.disabled = true;
+  setStatus('Reading your handwriting…');
+
+  try {
+    const images = await pdfToImages(selectedFile);
+    setStatus(images.length > 1 ? `Studying ${images.length} pages…` : 'Studying the page…');
+    const data = await callGemini(apiKey, images);
+    clearStatus();
+    const id = saveToHistory(data);
+    renderResults(data, { historyId: id });
+  } catch (err) {
+    clearStatus();
+    showError(err.message || 'Something went wrong. Please try again.');
+  } finally {
+    goBtn.disabled = false;
+  }
+});
+
+$('resetBtn').addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  filenameEl.textContent = '';
+  goBtn.disabled = true;
+  resultsEl.classList.remove('show');
+  lastData = null;
+  currentHistoryId = null;
+  doneState = {};
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+$('downloadBtn').addEventListener('click', () => { downloadPdf(); });
+
+// --- History (saved summaries), stored locally in this browser ---
+const HISTORY_KEY = 'inkbrief_history';
+const HISTORY_LIMIT = 20;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveToHistory(data) {
+  const history = loadHistory();
+  const id = 'h' + Date.now();
+  history.unshift({ id, topic: data.topic || 'Untitled notes', ts: Date.now(), data, doneState: {} });
+  if (history.length > HISTORY_LIMIT) history.length = HISTORY_LIMIT;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  return id;
+}
+
+function persistDoneStateToHistory() {
+  if (!currentHistoryId) return;
+  const history = loadHistory();
+  const item = history.find(h => h.id === currentHistoryId);
+  if (item) {
+    item.doneState = doneState;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' +
+         d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderHistoryList() {
+  const list = $('historyList');
+  const history = loadHistory();
+  if (!history.length) {
+    list.innerHTML = '<div class="history-empty">No saved summaries yet — summarize a PDF and it\'ll show up here.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  history.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const main = document.createElement('div');
+    main.className = 'history-item-main';
+    main.innerHTML = `<div class="history-item-topic">${escapeHtml(item.topic)}</div><div class="history-item-date">${formatDate(item.ts)}</div>`;
+    main.addEventListener('click', () => {
+      doneState = item.doneState || {};
+      renderResults(item.data, { keepDoneState: true, historyId: item.id });
+      closeModal('historyOverlay');
+    });
+
+    const del = document.createElement('button');
+    del.className = 'history-delete';
+    del.textContent = 'Delete';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const remaining = loadHistory().filter(h => h.id !== item.id);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(remaining));
+      if (currentHistoryId === item.id) currentHistoryId = null;
+      renderHistoryList();
+    });
+
+    row.appendChild(main);
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+function openModal(id) { $(id).classList.add('show'); }
+function closeModal(id) { $(id).classList.remove('show'); }
+
+$('historyBtn').addEventListener('click', () => {
+  renderHistoryList();
+  openModal('historyOverlay');
+});
+$('historyClose').addEventListener('click', () => closeModal('historyOverlay'));
+$('historyOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'historyOverlay') closeModal('historyOverlay');
+});
+
+// --- Flashcards ---
+let fcCards = [];
+let fcIndex = 0;
+let fcFlipped = false;
+
+function buildFlashcards(data) {
+  const cards = [];
+  (data.key_points || []).forEach(point => {
+    const match = point.match(/\*\*(.+?)\*\*/);
+    const term = match ? match[1] : null;
+    const front = term ? `What's this about?<br><strong>${escapeHtml(term)}</strong>` : 'Key point';
+    const back = boldify(point);
+    cards.push({ front, back });
+  });
+  if (data.example) {
+    cards.push({ front: 'Can you recall the example for this topic?', back: escapeHtml(data.example) });
+  }
+  return cards;
+}
+
+function renderFlashcard() {
+  const total = fcCards.length;
+  if (!total) {
+    $('fcProgress').textContent = '';
+    $('fcCardText').innerHTML = 'No key points to review yet — summarize a PDF first.';
+    $('fcPrev').disabled = true;
+    $('fcNext').disabled = true;
+    return;
+  }
+  $('fcProgress').textContent = `Card ${fcIndex + 1} of ${total}`;
+  const card = fcCards[fcIndex];
+  $('fcCardText').innerHTML = fcFlipped ? card.back : card.front;
+  $('fcCard').classList.toggle('flipped', fcFlipped);
+  $('fcPrev').disabled = fcIndex === 0;
+  $('fcNext').disabled = fcIndex === total - 1;
+}
+
+$('flashcardBtn').addEventListener('click', () => {
+  if (!lastData) return;
+  fcCards = buildFlashcards(lastData);
+  fcIndex = 0;
+  fcFlipped = false;
+  renderFlashcard();
+  openModal('fcOverlay');
+});
+$('fcClose').addEventListener('click', () => closeModal('fcOverlay'));
+$('fcOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'fcOverlay') closeModal('fcOverlay');
+});
+$('fcCard').addEventListener('click', () => {
+  fcFlipped = !fcFlipped;
+  renderFlashcard();
+});
+$('fcPrev').addEventListener('click', () => {
+  if (fcIndex > 0) { fcIndex--; fcFlipped = false; renderFlashcard(); }
+});
+$('fcNext').addEventListener('click', () => {
+  if (fcIndex < fcCards.length - 1) { fcIndex++; fcFlipped = false; renderFlashcard(); }
+});
+</script>
+</body>
+</html>
