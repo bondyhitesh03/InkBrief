@@ -30,12 +30,7 @@ installed is recommended (it's what removes the browser toolbar/tabs).
 Without Chrome/Edge/Brave, InkBrief still works perfectly — it just opens
 as a normal browser tab in your default browser instead.
 
-YOUR API KEY
-InkBrief already comes with an API key built in — there's nothing to
-paste in or set up. Just launch the app and start uploading notes.
-(This means all InkBrief users share the same key's free-tier quota,
-so if you hand this app to a lot of people at once, generation may
-occasionally slow down or hit a daily limit.)
+It requires an API key which is very easy to obtain and is free.
 
 REQUIRES INTERNET
 InkBrief needs an internet connection to read your notes (it calls
